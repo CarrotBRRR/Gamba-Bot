@@ -327,7 +327,7 @@ async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
         
         await update_leaderboard(guild_id)
 
-# ADMIN COMMANDS
+# -------------------------------- Admin Commands ---------------------------------
 
 @bot.hybrid_command(
     name='initlb',
