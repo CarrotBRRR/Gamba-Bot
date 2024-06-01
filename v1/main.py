@@ -1,4 +1,4 @@
-import os, json, sys, typing
+import os, json, sys, typing, asyncio
 import operator as op
 import random as rd
 import discord as dc
@@ -6,6 +6,10 @@ import discord as dc
 from discord.ext import commands as cm
 from discord.utils import get
 from dotenv import load_dotenv
+from math import log
+
+
+# ------------------------------------ Globals ------------------------------------
 
 load_dotenv()
 
@@ -15,98 +19,231 @@ intents.message_content = True
 
 bot = cm.Bot(command_prefix='gg.', intents=intents)
 
-async def init():
-    print('Initializing...')
+# -------------------------------- Helper Functions -------------------------------
 
-    # Create ./data directory if it doesn't exist
-    if not os.path.exists('./data'):
-        os.mkdir('./data')
-        print('\tCreated data directory')
+# Retrieve Guild Scores
+async def get_scores(guild_id):
+    with open(f'./data/{guild_id}/scores.json', 'r') as f:
+        return json.load(f)
 
-    # Create ./data/{guild.id}/leaderboard.json if it doesn't exist
-    print ('\tChecking guilds...')
-    for guild in bot.guilds:
-        # Create ./data/{guild.id} directory if it doesn't exist
-        if not os.path.exists(f'./data/{guild.id}'):
-            os.mkdir(f'./data/{guild.id}')
-            print(f'\t\tCreated directory for {guild.name}!')
+# Create User Score
+async def create_user_score(user_id, guild_id):
+    config = await get_config(guild_id)
+    name = dc.utils.get(bot.get_guild(guild_id).members, id=user_id).name
 
-        # Create ./data/{guild.id}/leaderboard.json if it doesn't exist
-        if not os.path.exists(f'./data/{guild.id}/leaderboard.json'):
-            with open(f'./data/{guild.id}/leaderboard.json', 'w') as f:
-                json.dump([], f, indent=4)
+    data = {
+        'id': user_id,
+        'name': name,
+        'points': config['initial_points']
+    }
 
-            print(f'\t\tCreated leaderboard file for {guild.name}!')
+    scores = await get_scores(guild_id)
+    scores.append(data)
 
-        if not os.path.exists(f'./data/{guild.id}/config.json'):
+    with open(f'./data/{guild_id}/scores.json', 'w+') as f:
+        json.dump(scores, f, indent=4)
 
-            config = {
-                'points_per_message': 10,
-                'leaderboard': {
-                    'channel_id': 0,
-                    'message_id': 0
-                    }
-                }
-            
-            with open(f'./data/{guild.id}/config.json', 'w') as f:
-                json.dump(config, f, indent=4)
+    await update_leaderboard(guild_id)
 
-            print(f'\t\tCreated config file for {guild.name}!')
+# Get User Score
+async def get_user_score(user_id, guild_id):
+    scores = await get_scores(guild_id)
+    config = await get_config(guild_id)
+    min_points = config['initial_points']
 
-    print('Initialization complete!')
+    for user in scores:
+        if user['id'] == user_id:
+            if user['points'] < min_points:
 
-async def add_points(user_id: int, guild_id: int):
-    with open(f'./data/{guild_id}/config.json', 'r') as f:
-        config = json.load(f)
+                await set_user_score(user_id, guild_id, config['initial_points'])
+                print(f'[INFO] User {user["name"]} had less than {min_points} points! Points Reset.')
 
-    with open(f'./data/{guild_id}/leaderboard.json', 'r') as f:
-        data = json.load(f)
+                return config['initial_points']
 
-    points = config['points_per_message']
+            else: 
+                return user['points']
 
-    for user in data:
+    await create_user_score(user_id, guild_id)
+
+    return config['initial_points']
+
+# Set User Score
+async def set_user_score(user_id, guild_id, score):
+    scores = await get_scores(guild_id)
+
+    for user in scores:
+        if user['id'] == user_id:
+            user['points'] = score
+            break
+
+    with open(f'./data/{guild_id}/scores.json', 'w+') as f:
+        json.dump(scores, f, indent=4)
+    
+    await update_leaderboard(guild_id)
+
+    return score
+
+# Add Points
+async def add_points(user_id, guild_id, points: int):
+    score = await get_user_score(user_id, guild_id)
+    scores = await get_scores(guild_id)
+
+    for user in scores:
         if user['id'] == user_id:
             user['points'] += points
             break
+    
+    with open(f'./data/{guild_id}/scores.json', 'w+') as f:
+        json.dump(scores, f, indent=4)
 
-    with open(f'./data/{guild_id}/leaderboard.json', 'w') as f:
-        json.dump(data, f, indent=4)
+    await update_leaderboard(guild_id)
 
-async def subtract_points(user_id: int, points: int, guild_id: int):
-    with open(f'./data/{guild_id}/leaderboard.json', 'r') as f:
-        data = json.load(f)
+# Subtract Points
+async def subtract_points(user_id, guild_id, points: int):
+    score = await get_user_score(user_id, guild_id)
+    scores = await get_scores(guild_id)
 
-    for user in data:
+    for user in scores:
         if user['id'] == user_id:
             user['points'] -= points
             break
+    
+    with open(f'./data/{guild_id}/scores.json', 'w+') as f:
+        json.dump(scores, f, indent=4)
+    
+    await update_leaderboard(guild_id)
 
-    with open(f'./data/{guild_id}/leaderboard.json', 'w') as f:
-        json.dump(data, f, indent=4)
-        
-async def getScores(guild_id: int):
-    with open(f'./data/{guild_id}/leaderboard.json', 'r') as f:
-        data = json.load(f)
+# ----------------------------------- Functions -----------------------------------
 
-    return data
+# ------------- CONFIG FILE ------------
 
-async def update_lb_message(guild_id: int):
+# Initialize Configs
+async def init_config(guild_id, guild_name):
+    print(f'[INFO] Initializing Guild {guild_name} Config...')
+
+    # Create Directory for Guild
+    if not os.path.exists(f'./data/{guild_id}'):
+        print(f'\tCreating Data Directory for Guild {guild_name}...')
+        os.makedirs(f'./data/{guild_id}')
+
+    if not os.path.exists(f'./data/{guild_id}/config.json'):
+        print(f'\tCreating Config File for Guild {guild_name}...')
+
+        config = {
+            'guild_id': guild_id,
+            'guild_name': guild_name,
+            'initial_points': 0,
+            'points_per_message': 0,
+            'leaderboard': {
+                'channel_id': 0,
+                'message_id': 0
+                }
+        }
+
+        with open(f'./data/{guild_id}/config.json', 'w+') as f:
+            json.dump(config, f, indent=4)
+
+    print(f'[INFO] Guild {guild_name} Config Initialized!')
+
+# Update Config
+async def update_config(guild_id, key, value):
+    config = await get_config(guild_id)
+
+    config[key] = value
+
+    with open(f'./data/{guild_id}/config.json', 'w+') as f:
+        json.dump(config, f, indent=4)
+
+# Get Config
+async def get_config(guild_id):
     with open(f'./data/{guild_id}/config.json', 'r') as f:
-        config = json.load(f)
+        return json.load(f)
 
-    with open(f'./data/{guild_id}/leaderboard.json', 'r') as f:
-        data = json.load(f)
+# ------------- SCORE FILE -------------
 
-    data.sort(key=op.itemgetter('points'), reverse=True)
+# Initialize Scores File
+async def init_scorefile(guild_id, guild_name):
+    print(f'[INFO] Initializing Score File for Guild {guild_name}...')
 
-    lb = 'Leaderboard:\n'
-    for i, user in enumerate(data):
-        lb += f'{i+1}. <@{user["id"]}> - {user["points"]} points\n'
+    if not os.path.exists(f'./data/{guild_id}/scores.json'):
+        print(f'\tCreating Score File for Guild {guild_name}...')
 
-    channel = bot.get_channel(config['leaderboard']['channel_id'])
-    message = await channel.fetch_message(config['leaderboard']['message_id'])
+        scores = []
 
-    await message.edit(embed=lb)
+        with open(f'./data/{guild_id}/scores.json', 'w+') as f:
+            json.dump(scores, f, indent=4)
+
+    print(f'[INFO] Score File {guild_name} Initialized!')
+
+# ----------- INITIALIZATION -----------
+
+# Initialize the Bot Data
+async def init():
+    # Create Data Directory
+    if not os.path.exists('./data'):
+        print('[INFO] Creating Data Directory...')
+        os.makedirs('./data')
+
+    # Create Data for Each Guild
+    for guild in bot.guilds:
+        await init_config(guild.id, guild.name)
+        await init_scorefile(guild.id, guild.name)
+
+# ------------- Leaderboard -------------
+async def create_leaderboard_embed(guild_id):
+    scores = await get_scores(guild_id)
+    scores.sort(key=op.itemgetter('points'), reverse=True)
+
+    embed = dc.Embed(
+        title='Leaderboard',
+        description='Top 8 Users',
+        color=dc.Color.yellow()
+    )
+
+    for i, user in enumerate(scores[:8]):
+        if user is None:
+            break
+
+        embed.add_field(
+            name=f'{i+1}. {user["name"]}',
+            value=f'{user["points"]} points',
+            inline=False
+        )
+
+    return embed
+
+# Update Leaderboard
+async def update_leaderboard(guild_id):
+    scores = await get_scores(guild_id)
+    scores.sort(key=op.itemgetter('points'), reverse=True)
+
+    config = await get_config(guild_id)
+
+    embed = await create_leaderboard_embed(guild_id)
+
+    if config['leaderboard']['message_id'] == 0:
+        return
+    
+    else: 
+        channel = bot.get_channel(config['leaderboard']['channel_id'])
+        message = await channel.fetch_message(config['leaderboard']['message_id'])
+
+        embed = await create_leaderboard_embed(guild_id)
+        await message.edit(embed=embed)
+
+# ----------------- Other ---------------
+
+# Update Score based on Guild points per message
+async def message_points(user_id, guild_id):
+    # Get Points per Message
+    config = await get_config(guild_id)
+    points = config['points_per_message']
+
+    # Add Points
+    await add_points(user_id, guild_id, points)
+
+
+# ----------------------------------- Bot Events ----------------------------------
 
 @bot.event
 async def on_ready():
@@ -120,70 +257,149 @@ async def on_guild_join(guild):
 
 @bot.event
 async def on_message(message):
-    if message.author == bot.user:
-        return
-    else:
-        add_points(message.author.id, message.guild.id)
+    ctx = await bot.get_context(message)
 
-    await bot.process_commands(message)
+    if message.author.bot:
+        return
+    
+    if message.guild is None:
+        await bot.process_commands(message)
+        return
+
+    if message.content.startswith('gg.') or ctx.valid:
+        await bot.process_commands(message)
+        return
+
+    else:
+        await message_points(message.author.id, message.guild.id)
+        print(f'{message.author.name} now has {await get_user_score(message.author.id, message.guild.id)} points!')
+        await bot.process_commands(message)
+
+# --------------------------------- Bot Commands ----------------------------------
 
 @bot.hybrid_command(
     name='balance',
-    aliases=['bal', 'points', 'p', 'b'],
+    aliases=['bal', 'b', 'points', 'p', 'score', 's'],
     description='Check your balance',
 )
 async def balance(ctx):
     guild_id = ctx.guild.id
     user_id = ctx.author.id
 
-    with open(f'./data/{guild_id}/leaderboard.json', 'r') as f:
-        data = json.load(f)
+    points = await get_user_score(user_id, guild_id)
 
-    for user in data:
-        if user['id'] == user_id:
-            ctx.send(f'You have {user["points"]} points!')
-
-@bot.hybrid_command(
-    name='initlb',
-    description='(Admin Only) Initialize the leaderboard'
-)
-@cm.has_permissions(administrator=True)
-async def initLB(ctx):
-    await getScores(ctx.guild.id)
-    with open(f'./data/{ctx.guild.id}/config.json', 'r') as f:
-        config = json.load(f)
+    await ctx.send(f'You have {points} points!')
 
 @bot.hybrid_command(
     name='bet',
     aliases=['gamba', 'gamble'],
     description='Gamble your points away'
 )
-async def gamba(ctx, points: int, odds: typing.Optional[float]=0.5):
+@cm.cooldown(1, 5, cm.BucketType.user)
+async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
     guild_id = ctx.guild.id
     user_id = ctx.author.id
 
-    with open(f'./data/{guild_id}/leaderboard.json', 'r') as f:
-        data = json.load(f)
+    if odds > 100 or odds <= 0:
+        await ctx.send('Odds must be between 0 and 100\nOdds are the percent chance of winning the bet\nIncreasing odds will decrease the payout\nDecreasing odds will increase the payout\nDefault odds are 50%', ephemeral=True)
+        return
 
-    for user in data:
-        if user['id'] == user_id:
-            if user['points'] < points:
-                await ctx.send('You do not have enough points!')
-                return
+    score = await get_user_score(user_id, guild_id)
 
-            user['points'] -= points
-
-            if rd.random() < odds:
-                user['points'] += points * 2
-                await ctx.send(f'You won {points * 2} points!')
-            else:
-                await ctx.send(f'You lost {points} points!')
-
-            break
-
-    with open(f'./data/{guild_id}/leaderboard.json', 'w') as f:
-        json.dump(data, f, indent=4)
+    if score < wager:
+        await ctx.send('You do not have enough points!')
+        return
     
+    else:
+        if odds < 50:
+            pot = int(wager * (- log(odds/100) + (1 + log(0.5))))
 
+        else:
+            pot = int(wager * ((1/(odds/100)) - 1))
+        
+        if rd.random()*100 < odds:
+            await add_points(user_id, guild_id, pot)
+            await ctx.send(f'You won {int(pot)} points!\nYour Balance: {await get_user_score(user_id, guild_id)} points')
+
+        else:
+            await subtract_points(user_id, guild_id, wager)
+            await ctx.send(f'You lost {wager} points!\nYour Balance: {await get_user_score(user_id, guild_id)} points')
+        
+        await update_leaderboard(guild_id)
+
+# ADMIN COMMANDS
+
+@bot.hybrid_command(
+    name='initlb',
+    description='(Admin Only) Initialize the leaderboard'
+)
+@cm.has_permissions(manage_messages=True)
+async def initLB(ctx):
+    em = await create_leaderboard_embed(ctx.guild.id)
+    lb = await ctx.send(embed=em)
+
+    lb_info = {
+        'channel_id': ctx.channel.id,
+        'message_id': lb.id
+    }
+
+    await update_config(ctx.guild.id, 'leaderboard', lb_info)
+
+@bot.hybrid_command(
+    name='initial_points',
+    description='(Admin Only) Set the initial points for a user'
+)
+@cm.has_permissions(manage_messages=True)
+async def setInitialPoints(ctx, points: int):
+    await update_config(ctx.guild.id, 'initial_points', points)
+    await ctx.send(f'Initial Points set to {points}!', ephemeral=True)
+
+@bot.hybrid_command(
+    name='points_per_message',
+    aliases=['ppm'],
+    description='(Admin Only) Set the points per message'
+)
+@cm.has_permissions(manage_messages=True)
+async def setPPM(ctx, points: int):
+    await update_config(ctx.guild.id, 'points_per_message', points)
+    await ctx.send(f'Points per message set to {points}!', ephemeral=True)
+
+# -------------------------------- Owner Commands ---------------------------------
+
+@bot.command(description="Initialize stack data")
+@cm.is_owner()
+async def start(ctx):
+    ctx.send("This command currently does nothing.")
+
+@bot.command(description="Turns off bot (bat restart)")
+@cm.is_owner()
+async def stop(ctx: cm.Context):
+    print(f'[INFO] Shutting down...')
+    await bot.close()
+
+
+@bot.command(description="sync all global commands")
+@cm.is_owner()
+async def sync(ctx: cm.Context):
+    print(f'[INFO] Sycning tree...')
+    await bot.tree.sync()
+    print(f'[INFO] Synced')
+
+@bot.command(description="initialize database for all guilds on startup")
+@cm.is_owner()
+async def go(ctx: cm.Context):
+    print(f'[INFO] Initializing...')
+    await init()
+    print(f'[INFO] Initialized')
+
+# ------------------------------------ ERRORS ------------------------------------
+@gamba.error
+async def gamba_error(ctx, error):
+
+    if isinstance(error, cm.CommandOnCooldown):
+        await ctx.send(f'Command is on cooldown! Please wait {error.retry_after:.2f} seconds.', ephemeral=True)
+
+    else:
+        await ctx.send('An unexpected error occured!', ephemeral=True)
 
 bot.run(os.getenv('TOKEN'))
