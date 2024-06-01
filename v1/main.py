@@ -304,6 +304,8 @@ async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
     guild_id = ctx.guild.id
     user_id = ctx.author.id
 
+    wager = abs(wager)
+
     if odds > 100 or odds <= 0:
         await ctx.send('Odds must be between 0 and 100\nOdds are the percent chance of winning the bet\nIncreasing odds will decrease the payout\nDecreasing odds will increase the payout\nDefault odds are 50%', ephemeral=True)
         return
