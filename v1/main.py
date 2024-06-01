@@ -6,7 +6,7 @@ import discord as dc
 from discord.ext import commands as cm
 from discord.utils import get
 from dotenv import load_dotenv
-from math import log
+from math import log, exp
 
 
 # ------------------------------------ Globals ------------------------------------
@@ -81,6 +81,8 @@ async def set_user_score(user_id, guild_id, score):
     
     await update_leaderboard(guild_id)
 
+    print(f'Set {dc.utils.get(bot.get_guild(guild_id).members, id=user_id).name}\'s points to {score}!')
+
     return score
 
 # Add Points
@@ -97,6 +99,7 @@ async def add_points(user_id, guild_id, points: int):
         json.dump(scores, f, indent=4)
 
     await update_leaderboard(guild_id)
+    print(f'+ {points} points to {dc.utils.get(bot.get_guild(guild_id).members, id=user_id).name}')
 
 # Subtract Points
 async def subtract_points(user_id, guild_id, points: int):
@@ -112,6 +115,7 @@ async def subtract_points(user_id, guild_id, points: int):
         json.dump(scores, f, indent=4)
     
     await update_leaderboard(guild_id)
+    print(f'- {points} points to {dc.utils.get(bot.get_guild(guild_id).members, id=user_id).name}')
 
 # ----------------------------------- Functions -----------------------------------
 
@@ -195,10 +199,11 @@ async def create_leaderboard_embed(guild_id):
     scores.sort(key=op.itemgetter('points'), reverse=True)
 
     embed = dc.Embed(
-        title='Leaderboard',
-        description='Top 8 Users',
-        color=dc.Color.yellow()
+        title='Top 8 Gamblers',
+        color=dc.Color.yellow(),
     )
+
+    embed.set_footer(text='gamble responsibly lmao')
 
     for i, user in enumerate(scores[:8]):
         if user is None:
@@ -272,7 +277,6 @@ async def on_message(message):
 
     else:
         await message_points(message.author.id, message.guild.id)
-        print(f'{message.author.name} now has {await get_user_score(message.author.id, message.guild.id)} points!')
         await bot.process_commands(message)
 
 # --------------------------------- Bot Commands ----------------------------------
@@ -295,7 +299,7 @@ async def balance(ctx):
     aliases=['gamba', 'gamble'],
     description='Gamble your points away'
 )
-@cm.cooldown(1, 5, cm.BucketType.user)
+@cm.cooldown(1, 10, cm.BucketType.user)
 async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
     guild_id = ctx.guild.id
     user_id = ctx.author.id
@@ -311,14 +315,16 @@ async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
         return
     
     else:
-        if odds < 50:
-            pot = int(wager * (- log(odds/100) + (1 + log(0.5))))
+        if odds <= 50:
+            pot = wager * (- log(odds/100) + (1 + log(0.5)))
 
         else:
-            pot = int(wager * ((1/(odds/100)) - 1))
+            pot = wager * (exp(-(odds/10) + 5) - exp(-5))
+            print(pot)
+            print(pot/wager)
         
         if rd.random()*100 < odds:
-            await add_points(user_id, guild_id, pot)
+            await add_points(user_id, guild_id, int(pot))
             await ctx.send(f'You won {int(pot)} points!\nYour Balance: {await get_user_score(user_id, guild_id)} points')
 
         else:
