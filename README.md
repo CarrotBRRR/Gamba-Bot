@@ -21,7 +21,8 @@ the intercept with the horizontal line is default odds, return</br>
     - increased cooldown on commands
     - removed redundant update
 
-## IN PROGRESS:
 ## v0.1.3
 - batch distribution points per message
-- /betall to go all in
+- /allin to go all in
+
+## IN PROGRESS:

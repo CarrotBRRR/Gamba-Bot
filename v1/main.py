@@ -367,7 +367,7 @@ async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
     name='allin',
     description='Gamble all your points away'
 )
-async def allin(ctx, odds: typing.Optional[float]=50.0):
+async def AllIn(ctx, odds: typing.Optional[float]=50.0):
     guild_id = ctx.guild.id
     user_id = ctx.author.id
 
