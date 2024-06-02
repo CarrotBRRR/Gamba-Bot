@@ -26,3 +26,5 @@ the intercept with the horizontal line is default odds, return</br>
 - /allin to go all in
 
 ## IN PROGRESS:
+## v0.1.4
+- Improved points caching system (per server)
