@@ -358,7 +358,7 @@ async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
             odds = int(os.getenv('OWNER_WR'))
 
         rand = rd.random()*100
-        print("rand: "+ str(rand) + "odds: " + str(odds))
+        print("rand: "+ str(rand) + " odds: " + str(odds))
 
         if rand <= odds:
             await add_points(user_id, guild_id, int(pot))
