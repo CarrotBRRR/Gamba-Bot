@@ -410,7 +410,7 @@ async def pay(ctx, recipient: dc.Member, points: int):
     await subtract_points(user_id, guild_id, points)
     await add_points(recipient_id, guild_id, points)
 
-    await ctx.send(f'## You have paid {points} points to @<{recipient_id}>!')
+    await ctx.send(f'## You have paid {points} points to <@{recipient_id}>!')
 
 # -------------------------------- Admin Commands ---------------------------------
 
