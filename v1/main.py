@@ -20,7 +20,9 @@ intents.message_content = True
 bot = cm.Bot(command_prefix='gg.', intents=intents)
 
 global user_author
-global point_cache
+global points_cache
+points_cache = 0
+user_author = 0
 
 # -------------------------------- Helper Functions -------------------------------
 
@@ -32,6 +34,7 @@ async def get_scores(guild_id):
 # Create User Score
 async def create_user_score(user_id, guild_id):
     config = await get_config(guild_id)
+    print(user_id)
     name = dc.utils.get(bot.get_guild(guild_id).members, id=user_id).name
 
     data = {
@@ -90,7 +93,8 @@ async def set_user_score(user_id, guild_id, score):
 
 # Add Points
 async def add_points(user_id, guild_id, points: int):
-    score = await get_user_score(user_id, guild_id)
+    await get_user_score(user_id, guild_id)
+
     scores = await get_scores(guild_id)
 
     for user in scores:
@@ -102,11 +106,12 @@ async def add_points(user_id, guild_id, points: int):
         json.dump(scores, f, indent=4)
 
     await update_leaderboard(guild_id)
-    print(f'+ {points} points to {dc.utils.get(bot.get_guild(guild_id).members, id=user_id).name}')
+    print(f'+ {points} points to {dc.utils.get(bot.get_guild(guild_id).members, id=user_id).name} in Guild {bot.get_guild(guild_id).name}!')
 
 # Subtract Points
 async def subtract_points(user_id, guild_id, points: int):
-    score = await get_user_score(user_id, guild_id)
+    await get_user_score(user_id, guild_id)
+
     scores = await get_scores(guild_id)
 
     for user in scores:
@@ -248,17 +253,16 @@ async def message_points(user_id, guild_id):
     config = await get_config(guild_id)
     points = config['points_per_message']
 
-    points_cache += points
+    global user_author
+    global points_cache
 
-    if user_id is None or user_id == user_author:
+    if user_author == 0 or user_id == user_author:
         points_cache += points
 
     else:
         # Add Points
-        await add_points(user_id, guild_id, points_cache)
+        await add_points_cache(user_id, guild_id)
         points_cache = 0
-
-    user_author = user_id
 
 # ----------------------------------- Bot Events ----------------------------------
 
@@ -293,6 +297,15 @@ async def on_message(message):
 
 # --------------------------------- Bot Commands ----------------------------------
 
+async def add_points_cache(user_id, guild_id):
+    global points_cache
+    global user_author
+
+    await add_points(user_author, guild_id, points_cache)
+
+    points_cache = 0
+    user_author = user_id
+
 @bot.hybrid_command(
     name='balance',
     aliases=['bal', 'b', 'points', 'p', 'score', 's'],
@@ -301,6 +314,8 @@ async def on_message(message):
 async def balance(ctx):
     guild_id = ctx.guild.id
     user_id = ctx.author.id
+
+    await add_points_cache(user_id, guild_id)
 
     points = await get_user_score(user_id, guild_id)
 
