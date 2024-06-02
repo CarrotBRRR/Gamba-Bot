@@ -274,6 +274,8 @@ async def message_points(user_id, guild_id):
         # Add Points
         await add_points_cache(user_id, guild_id)
         points_cache = 0
+    
+    user_author = user_id
 
 # ----------------------------------- Bot Events ----------------------------------
 
