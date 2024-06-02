@@ -12,3 +12,9 @@ the intercept with the horizontal line is default odds, return</br>
 ## v0.1
 - Betting 
 - Points Per Message
+
+# v0.1.1
+- fixed negative betting
+
+# v0.1.2
+- fixed ratelimiting problem

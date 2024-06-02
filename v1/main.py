@@ -219,6 +219,7 @@ async def create_leaderboard_embed(guild_id):
 
 # Update Leaderboard
 async def update_leaderboard(guild_id):
+    print(f'[INFO] Updating Leaderboard for Guild {bot.get_guild(guild_id).name}...')
     scores = await get_scores(guild_id)
     scores.sort(key=op.itemgetter('points'), reverse=True)
 
@@ -299,7 +300,7 @@ async def balance(ctx):
     aliases=['gamba', 'gamble'],
     description='Gamble your points away'
 )
-@cm.cooldown(1, 10, cm.BucketType.user)
+@cm.cooldown(1, 15, cm.BucketType.user)
 async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
     guild_id = ctx.guild.id
     user_id = ctx.author.id
@@ -332,8 +333,6 @@ async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
         else:
             await subtract_points(user_id, guild_id, wager)
             await ctx.send(f'You lost {wager} points!\nYour Balance: {await get_user_score(user_id, guild_id)} points')
-        
-        await update_leaderboard(guild_id)
 
 # -------------------------------- Admin Commands ---------------------------------
 
