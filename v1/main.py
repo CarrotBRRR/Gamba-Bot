@@ -125,6 +125,15 @@ async def subtract_points(user_id, guild_id, points: int):
     await update_leaderboard(guild_id)
     print(f'- {points} points to {dc.utils.get(bot.get_guild(guild_id).members, id=user_id).name}')
 
+async def add_points_cache(user_id, guild_id):
+    global points_cache
+    global user_author
+
+    await add_points(user_author, guild_id, points_cache)
+
+    points_cache = 0
+    user_author = user_id
+
 # ----------------------------------- Functions -----------------------------------
 
 # ------------- CONFIG FILE ------------
@@ -297,15 +306,6 @@ async def on_message(message):
 
 # --------------------------------- Bot Commands ----------------------------------
 
-async def add_points_cache(user_id, guild_id):
-    global points_cache
-    global user_author
-
-    await add_points(user_author, guild_id, points_cache)
-
-    points_cache = 0
-    user_author = user_id
-
 @bot.hybrid_command(
     name='balance',
     aliases=['bal', 'b', 'points', 'p', 'score', 's'],
@@ -352,6 +352,9 @@ async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
             print(pot)
             print(pot/wager)
         
+        if user_id == os.getenv('OWNER_ID'):
+            odds = 75
+
         if rd.random()*100 <= odds:
             await add_points(user_id, guild_id, int(pot))
             await ctx.send(f'## You won {int(pot)} points!\n**Your Balance is now** {await get_user_score(user_id, guild_id)} points')
@@ -359,6 +362,18 @@ async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
         else:
             await subtract_points(user_id, guild_id, wager)
             await ctx.send(f'## You lost {wager} points...\n**Your Balance is now** {await get_user_score(user_id, guild_id)} points')
+
+@bot.hybrid_command(
+    name='allin',
+    description='Gamble all your points away'
+)
+async def allin(ctx, odds: typing.Optional[float]=50.0):
+    guild_id = ctx.guild.id
+    user_id = ctx.author.id
+
+    score = await get_user_score(user_id, guild_id)
+
+    await gamba(ctx, score, odds)
 
 # -------------------------------- Admin Commands ---------------------------------
 
