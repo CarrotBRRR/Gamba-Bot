@@ -19,6 +19,9 @@ intents.message_content = True
 
 bot = cm.Bot(command_prefix='gg.', intents=intents)
 
+global user_author
+global point_cache
+
 # -------------------------------- Helper Functions -------------------------------
 
 # Retrieve Guild Scores
@@ -245,9 +248,17 @@ async def message_points(user_id, guild_id):
     config = await get_config(guild_id)
     points = config['points_per_message']
 
-    # Add Points
-    await add_points(user_id, guild_id, points)
+    points_cache += points
 
+    if user_id is None or user_id == user_author:
+        points_cache += points
+
+    else:
+        # Add Points
+        await add_points(user_id, guild_id, points_cache)
+        points_cache = 0
+
+    user_author = user_id
 
 # ----------------------------------- Bot Events ----------------------------------
 
@@ -326,13 +337,13 @@ async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
             print(pot)
             print(pot/wager)
         
-        if rd.random()*100 < odds:
+        if rd.random()*100 <= odds:
             await add_points(user_id, guild_id, int(pot))
-            await ctx.send(f'You won {int(pot)} points!\nYour Balance: {await get_user_score(user_id, guild_id)} points')
+            await ctx.send(f'## You won {int(pot)} points!\n**Your Balance is now** {await get_user_score(user_id, guild_id)} points')
 
         else:
             await subtract_points(user_id, guild_id, wager)
-            await ctx.send(f'You lost {wager} points!\nYour Balance: {await get_user_score(user_id, guild_id)} points')
+            await ctx.send(f'## You lost {wager} points...\n**Your Balance is now** {await get_user_score(user_id, guild_id)} points')
 
 # -------------------------------- Admin Commands ---------------------------------
 

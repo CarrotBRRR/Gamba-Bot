@@ -13,10 +13,15 @@ the intercept with the horizontal line is default odds, return</br>
 - Betting 
 - Points Per Message
 
-# v0.1.1
+## v0.1.1
 - fixed negative betting
 
-# v0.1.2
+## v0.1.2
 - fixed ratelimiting problem
     - increased cooldown on commands
     - removed redundant update
+
+## IN PROGRESS:
+## v0.1.3
+- batch distribution points per message
+- /betall to go all in
