@@ -457,4 +457,14 @@ async def gamba_error(ctx, error):
         print(error)
         await ctx.send('An unexpected error occured!', ephemeral=True)
 
+@AllIn.error
+async def gamba_error(ctx, error):
+
+    if isinstance(error, cm.CommandOnCooldown):
+        await ctx.send(f'Command is on cooldown! Please wait {error.retry_after:.2f} seconds.', ephemeral=True)
+
+    else:
+        print(error)
+        await ctx.send('An unexpected error occured!', ephemeral=True)
+
 bot.run(os.getenv('TOKEN'))
