@@ -18,3 +18,5 @@ the intercept with the horizontal line is default odds, return</br>
 
 # v0.1.2
 - fixed ratelimiting problem
+    - increased cooldown on commands
+    - removed redundant update
