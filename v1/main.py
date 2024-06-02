@@ -372,6 +372,7 @@ async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
     name='allin',
     description='Gamble all your points away'
 )
+@cm.cooldown(1, 15, cm.BucketType.user)
 async def AllIn(ctx, odds: typing.Optional[float]=50.0):
     guild_id = ctx.guild.id
     user_id = ctx.author.id
