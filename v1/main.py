@@ -129,7 +129,8 @@ async def add_points_cache(user_id, guild_id):
     global points_cache
     global user_author
 
-    await add_points(user_author, guild_id, points_cache)
+    if user_author != 0:
+        await add_points(user_author, guild_id, points_cache)
 
     points_cache = 0
     user_author = user_id
@@ -266,6 +267,7 @@ async def message_points(user_id, guild_id):
     global points_cache
 
     if user_author == 0 or user_id == user_author:
+        print(f'Adding {points} points for {dc.utils.get(bot.get_guild(guild_id).members, id=user_id).name} to the cache!')
         points_cache += points
 
     else:
