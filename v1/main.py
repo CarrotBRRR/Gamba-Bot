@@ -129,7 +129,7 @@ async def add_points_cache(user_id, guild_id):
     global points_cache
     global user_author
 
-    if user_author != 0:
+    if user_author != 0 and points_cache != 0:
         await add_points(user_author, guild_id, points_cache)
 
     points_cache = 0
