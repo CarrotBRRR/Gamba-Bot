@@ -354,8 +354,8 @@ async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
             print(pot)
             print(pot/wager)
 
-        if user_id == int(os.getenv('OWNER_ID')):
-            odds = 90
+        if str(user_id) == os.getenv('OWNER_ID'):
+            odds = os.getenv('OWNER_WR')
 
         rand = rd.random()*100
         print("rand: "+ rand + "odds: " + odds)
