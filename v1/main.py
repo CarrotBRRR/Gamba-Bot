@@ -383,6 +383,35 @@ async def AllIn(ctx, odds: typing.Optional[float]=50.0):
 
     await gamba(ctx, score, odds)
 
+@bot.hybrid_command(
+    name='pay',
+    description='Pay another user points'
+)
+@cm.cooldown(1, 15, cm.BucketType.user)
+async def pay(ctx, recipient: dc.Member, points: int):
+    guild_id = ctx.guild.id
+    user_id = ctx.author.id
+    recipient_id = recipient.id
+
+    if points <= 0:
+        await ctx.send('You must pay a positive amount of points!', ephemeral=True)
+        return
+
+    if user_id == recipient_id:
+        await ctx.send('You cannot pay yourself!', ephemeral=True)
+        return
+
+    score = await get_user_score(user_id, guild_id)
+
+    if score < points:
+        await ctx.send('You do not have enough points!', ephemeral=True)
+        return
+
+    await subtract_points(user_id, guild_id, points)
+    await add_points(recipient_id, guild_id, points)
+
+    await ctx.send(f'## You have paid {points} points to @<{recipient_id}>!')
+
 # -------------------------------- Admin Commands ---------------------------------
 
 @bot.hybrid_command(
