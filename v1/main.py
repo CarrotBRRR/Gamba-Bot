@@ -144,7 +144,6 @@ async def send_points(sender, recipient: dc.Member, guild_id, points: int):
         json.dump(scores, f, indent=4)
 
     await update_leaderboard(guild_id)
-    print(f'{points} points from {dc.utils.get(bot.get_guild(guild_id).members, id=sender).name} to {dc.utils.get(bot.get_guild(guild_id).members, id=recipient).name}')
 
 async def add_points_cache(user_id, guild_id):
     global points_cache
@@ -437,6 +436,7 @@ async def pay(ctx, recipient: dc.Member, points: int):
     await send_points(user_id, recipient, guild_id, points)
 
     await ctx.send(f'## You have paid {points} points to <@{recipient_id}>!')
+    print(f'{ctx.author.name} has paid {points} points to {recipient.name} in guild {ctx.guild.name}!')
 
 # -------------------------------- Admin Commands ---------------------------------
 
