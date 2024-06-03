@@ -68,7 +68,7 @@ async def get_user_score(user_id, guild_id):
 
             else: 
                 return user['points']
-
+            
     await create_user_score(user_id, guild_id)
 
     return config['initial_points']
@@ -127,7 +127,7 @@ async def subtract_points(user_id, guild_id, points: int):
 
 async def send_points(sender, recipient: dc.Member, guild_id, points: int):
     sender_score = await get_user_score(sender, guild_id)
-    recipient_score = await get_user_score(recipient, guild_id)
+    recipient_score = await get_user_score(recipient.id, guild_id)
 
     scores = await get_scores(guild_id)
 
@@ -135,8 +135,9 @@ async def send_points(sender, recipient: dc.Member, guild_id, points: int):
         if user['id'] == sender:
             user['points'] -= points
             break
-
-        if user['id'] == recipient:
+    
+    for user in scores:
+        if user['id'] == recipient.id:
             user['points'] += points
             break
 
@@ -516,6 +517,16 @@ async def gamba_error(ctx, error):
 
 @AllIn.error
 async def gamba_error(ctx, error):
+
+    if isinstance(error, cm.CommandOnCooldown):
+        await ctx.send(f'Command is on cooldown! Please wait {error.retry_after:.2f} seconds.', ephemeral=True)
+
+    else:
+        print(error)
+        await ctx.send('An unexpected error occured!', ephemeral=True)
+
+@pay.error
+async def pay_error(ctx, error):
 
     if isinstance(error, cm.CommandOnCooldown):
         await ctx.send(f'Command is on cooldown! Please wait {error.retry_after:.2f} seconds.', ephemeral=True)
