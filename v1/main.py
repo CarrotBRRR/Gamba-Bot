@@ -125,6 +125,27 @@ async def subtract_points(user_id, guild_id, points: int):
     await update_leaderboard(guild_id)
     print(f'- {points} points to {dc.utils.get(bot.get_guild(guild_id).members, id=user_id).name}')
 
+async def send_points(sender, recipient: dc.Member, guild_id, points: int):
+    sender_score = await get_user_score(sender, guild_id)
+    recipient_score = await get_user_score(recipient, guild_id)
+
+    scores = await get_scores(guild_id)
+
+    for user in scores:
+        if user['id'] == sender:
+            user['points'] -= points
+            break
+
+        if user['id'] == recipient:
+            user['points'] += points
+            break
+
+    with open(f'./data/{guild_id}/scores.json', 'w+') as f:
+        json.dump(scores, f, indent=4)
+
+    await update_leaderboard(guild_id)
+    print(f'{points} points from {dc.utils.get(bot.get_guild(guild_id).members, id=sender).name} to {dc.utils.get(bot.get_guild(guild_id).members, id=recipient).name}')
+
 async def add_points_cache(user_id, guild_id):
     global points_cache
     global user_author
@@ -356,7 +377,7 @@ async def gamba(ctx, wager: int, odds: typing.Optional[float]=50.0):
             print(pot)
             print(pot/wager)
 
-        if int(os.getenv('OWNER_ID')) == user_id:
+        if int(os.getenv('OWNER_ID')) == user_id and odds < int(os.getenv('OWNER_WR')):
             odds = int(os.getenv('OWNER_WR'))
 
         rand = rd.random()*100
@@ -413,8 +434,7 @@ async def pay(ctx, recipient: dc.Member, points: int):
         await ctx.send('You do not have enough points!', ephemeral=True)
         return
 
-    await subtract_points(user_id, guild_id, points)
-    await add_points(recipient_id, guild_id, points)
+    await send_points(user_id, recipient, guild_id, points)
 
     await ctx.send(f'## You have paid {points} points to <@{recipient_id}>!')
 
