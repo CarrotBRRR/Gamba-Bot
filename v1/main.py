@@ -336,9 +336,12 @@ async def on_message(message):
     aliases=['bal', 'b', 'points', 'p', 'score', 's'],
     description='Check your balance',
 )
-async def balance(ctx):
+async def balance(ctx, member: typing.Optional[dc.Member] = None):
     guild_id = ctx.guild.id
-    user_id = ctx.author.id
+    if member is None:
+        user_id = ctx.author.id
+    else:
+        user_id = member.id
 
     await add_points_cache(user_id, guild_id)
 
