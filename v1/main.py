@@ -393,6 +393,8 @@ async def pay(ctx, recipient: dc.Member, points: int):
     user_id = ctx.author.id
     recipient_id = recipient.id
 
+    config = await get_config(guild_id)
+
     if points <= 0:
         await ctx.send('You must pay a positive amount of points!', ephemeral=True)
         return
@@ -402,6 +404,10 @@ async def pay(ctx, recipient: dc.Member, points: int):
         return
 
     score = await get_user_score(user_id, guild_id)
+
+    if score <= config['initial_points']:
+        await ctx.send(f'You must have at least {config['initial_points']} points to pay!', ephemeral=True)
+        return
 
     if score < points:
         await ctx.send('You do not have enough points!', ephemeral=True)
